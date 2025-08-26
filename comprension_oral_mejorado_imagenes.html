@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<link rel="manifest" href="manifest.json">
+<script>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js");
+  }
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📚 Comprensión Lectora Interactiva</title>
+<style>
+  :root{
+    --primary:#2e7d32;
+    --accent:#29b6f6;
+    --soft:#f1f8e9;
+  }
+  *{box-sizing:border-box}
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+    margin: 0;
+    background: linear-gradient(to bottom, #e0f7fa, #ffffff);
+    color: #333;
+    padding: 20px;
+  }
+  h1 {
+    text-align: center;
+    color: var(--primary);
+    font-size: 2rem;
+    margin: 0 0 16px;
+  }
+  .tip {
+    max-width: 900px;
+    margin: 0 auto 16px;
+    background:#ffffff;
+    border-left:6px solid var(--accent);
+    padding:12px 14px;
+    border-radius:12px;
+    box-shadow:0 2px 8px rgba(0,0,0,.08);
+    font-size:0.95rem;
+  }
+  .story {
+    background: #ffffff;
+    padding: 20px;
+    margin: 20px auto;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    max-width: 900px;
+  }
+  h2 {
+    color: #004d40;
+    margin:0 0 8px;
+    font-size:1.3rem;
+  }
+  p {
+    font-size: 1.05rem;
+    line-height: 1.5;
+  }
+  .hero {
+    display:flex; gap:20px; align-items:center; flex-wrap:wrap;
+  }
+  .hero img {
+    width: 240px; max-width: 100%;
+    border-radius: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    background:#fff;
+  }
+  .actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  .question {
+    margin: 15px 0;
+    background: var(--soft);
+    padding: 12px;
+    border-radius: 12px;
+  }
+  .question p {
+    margin: 0 0 8px 0;
+    font-weight: 600;
+    display:flex; align-items:center; gap:8px;
+  }
+  .q-icon{ font-size:1.2rem; }
+  .options button {
+    margin: 5px;
+    padding: 12px 18px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: transform 0.2s, background 0.3s, box-shadow .2s;
+    background: #b2ebf2;
+    box-shadow:0 2px 4px rgba(0,0,0,.12);
+  }
+  .options button:hover {
+    transform: translateY(-1px);
+    background: #80deea;
+  }
+  .options button.correct { background: #66bb6a !important; color: white; }
+  .options button.incorrect { background: #ef5350 !important; color: white; }
+  .options button.selected { background: #ffca28; }
+  .score-board {
+    background: #fff9c4;
+    padding: 12px;
+    border-radius: 12px;
+    margin-top: 15px;
+    font-weight: 700;
+    text-align: center;
+  }
+  button.action {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 18px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 1rem;
+    transition: background 0.3s, transform 0.2s, box-shadow .2s;
+    box-shadow:0 2px 6px rgba(0,0,0,.15);
+  }
+  button.action:hover {
+    background: #0288d1;
+    transform: translateY(-1px);
+  }
+  .footer-controls{ text-align:center; margin: 10px 0 30px; }
+</style>
+</head>
+<body>
+<h1>📚 Comprensión Lectora Interactiva</h1>
+<div class="tip">Consejo: pulsa <strong>🔊 Escuchar</strong> para oír la historia. Selecciona una o más respuestas y después pulsa <strong>✅ Enviar respuestas</strong>.</div>
+
+<div id="stories-container"></div>
+
+<div class="score-board" id="final-score">Puntuación total: 0</div>
+<div class="footer-controls">
+  <button class="action" onclick="restart()">🔄 Reiniciar</button>
+</div>
+
+<script>
+let rotationIndex = 0;
+let totalScore = 0;
+
+// Historias con imágenes ilustrativas (SVG incrustado) que coinciden con cada cuento
+const stories = [
+  { title:"El gato Tomás", text:"Tomás era un gato negro que vivía en una casa amarilla. Le gustaba dormir en el sofá azul y jugar con una pelota roja. Cada noche miraba la luna por la ventana.", img:"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22700%22%20height%3D%22380%22%3E%0A%20%20%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23E8EAF6%22/%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%22160%22%3E%F0%9F%90%B1%3C/text%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2290%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2228%22%20fill%3D%22%2337474F%22%20font-family%3D%22Arial%2C%20sans-serif%22%3EEl%20gato%20Tom%C3%A1s%3C/text%3E%0A%3C/svg%3E", questions:[{q:"¿De qué color era el gato?", options:["Negro","Blanco"], correct:0},{q:"¿Cómo se llamaba el gato?", options:["Tomás","Pepe"], correct:0},{q:"¿Dónde vivía Tomás?", options:["En una casa amarilla","En el bosque"], correct:0}]},
+  { title:"La ardilla Lola", text:"Lola era una ardilla marrón que corría en el parque. Guardaba nueces debajo de un árbol grande. Un perro blanco la miraba curioso, pero nunca la perseguía. Lola siempre volvía feliz a su nido.", img:"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22700%22%20height%3D%22380%22%3E%0A%20%20%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23FFF8E1%22/%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%22160%22%3E%F0%9F%90%BF%EF%B8%8F%3C/text%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2290%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2228%22%20fill%3D%22%2337474F%22%20font-family%3D%22Arial%2C%20sans-serif%22%3ELa%20ardilla%20Lola%3C/text%3E%0A%3C/svg%3E", questions:[{q:"¿Cómo se llamaba la ardilla?", options:["Lola","Clara"], correct:0},{q:"¿De qué color era Lola?", options:["Marrón","Negra"], correct:0},{q:"¿Dónde corría Lola?", options:["En el parque","En la cocina"], correct:0}]},
+  { title:"El perro Bruno", text:"Bruno era un perro café que vivía con Ana. Le encantaba correr tras la pelota verde. Un día encontró un hueso en el jardín y lo escondió bajo la tierra para luego comerlo.", img:"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22700%22%20height%3D%22380%22%3E%0A%20%20%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23E1F5FE%22/%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%22160%22%3E%F0%9F%90%B6%3C/text%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2290%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2228%22%20fill%3D%22%2337474F%22%20font-family%3D%22Arial%2C%20sans-serif%22%3EEl%20perro%20Bruno%3C/text%3E%0A%3C/svg%3E", questions:[{q:"¿Cómo se llamaba el perro?", options:["Bruno","Pablo"], correct:0},{q:"¿De qué color era Bruno?", options:["Café","Blanco"], correct:0},{q:"¿Con quién vivía?", options:["Con Ana","Con Sofía"], correct:0}]},
+  { title:"La mariposa Azul", text:"Una mariposa azul volaba en el jardín. Se posó en una flor amarilla y luego en otra roja. El sol brillaba fuerte y las flores se movían con el viento suave de la mañana.", img:"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22700%22%20height%3D%22380%22%3E%0A%20%20%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23E3F2FD%22/%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%22160%22%3E%F0%9F%A6%8B%3C/text%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2290%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2228%22%20fill%3D%22%2337474F%22%20font-family%3D%22Arial%2C%20sans-serif%22%3ELa%20mariposa%20Azul%3C/text%3E%0A%3C/svg%3E", questions:[{q:"¿De qué color era la mariposa?", options:["Azul","Roja"], correct:0},{q:"¿Dónde volaba?", options:["En el jardín","En la cocina"], correct:0},{q:"¿En qué flor se posó primero?", options:["Amarilla","Roja"], correct:0}]},
+  { title:"El pez Dorado", text:"Había un pez dorado que nadaba en una pecera redonda. Dentro tenía piedras blancas y un castillo pequeño. El pez hacía burbujas y saludaba con su cola cada vez que veía a Sofía acercarse.", img:"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22700%22%20height%3D%22380%22%3E%0A%20%20%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23E0F7FA%22/%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%22160%22%3E%F0%9F%90%A0%3C/text%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2290%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2228%22%20fill%3D%22%2337474F%22%20font-family%3D%22Arial%2C%20sans-serif%22%3EEl%20pez%20Dorado%3C/text%3E%0A%3C/svg%3E", questions:[{q:"¿De qué color era el pez?", options:["Dorado","Gris"], correct:0},{q:"¿Dónde nadaba?", options:["En una pecera redonda","En un río"], correct:0},{q:"¿De qué color eran las piedras?", options:["Blancas","Negras"], correct:0}]},
+  { title:"El conejo Nico", text:"Nico era un conejo blanco que vivía en el bosque. Le gustaba saltar entre las flores y comer zanahorias. Un día encontró una madriguera y decidió quedarse allí a dormir muy tranquilo.", img:"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22700%22%20height%3D%22380%22%3E%0A%20%20%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23F3E5F5%22/%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%22160%22%3E%F0%9F%90%B0%3C/text%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2290%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2228%22%20fill%3D%22%2337474F%22%20font-family%3D%22Arial%2C%20sans-serif%22%3EEl%20conejo%20Nico%3C/text%3E%0A%3C/svg%3E", questions:[{q:"¿Cómo se llamaba el conejo?", options:["Nico","Pepe"], correct:0},{q:"¿De qué color era Nico?", options:["Blanco","Marrón"], correct:0},{q:"¿Dónde vivía?", options:["En el bosque","En la ciudad"], correct:0}]},
+  { title:"El oso Pablo", text:"Pablo era un oso grande y marrón. Vivía en una cueva cerca del río. Le gustaba pescar peces con sus patas y luego dormir bajo un árbol. Cada mañana saludaba al sol con un rugido.", img:"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22700%22%20height%3D%22380%22%3E%0A%20%20%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23FBE9E7%22/%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%22160%22%3E%F0%9F%90%BB%3C/text%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2290%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2228%22%20fill%3D%22%2337474F%22%20font-family%3D%22Arial%2C%20sans-serif%22%3EEl%20oso%20Pablo%3C/text%3E%0A%3C/svg%3E", questions:[{q:"¿Cómo se llamaba el oso?", options:["Pablo","Bruno"], correct:0},{q:"¿De qué color era Pablo?", options:["Marrón","Negro"], correct:0},{q:"¿Dónde vivía?", options:["En una cueva","En una casa"], correct:0}]},
+  { title:"La tortuga Clara", text:"Clara era una tortuga verde que caminaba despacio por el jardín. Tenía un caparazón brillante y le gustaba descansar junto a las flores. Siempre miraba al cielo cuando pasaban pájaros volando sobre ella.", img:"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22700%22%20height%3D%22380%22%3E%0A%20%20%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23E8F5E9%22/%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%22160%22%3E%F0%9F%90%A2%3C/text%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2290%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2228%22%20fill%3D%22%2337474F%22%20font-family%3D%22Arial%2C%20sans-serif%22%3ELa%20tortuga%20Clara%3C/text%3E%0A%3C/svg%3E", questions:[{q:"¿Cómo se llamaba la tortuga?", options:["Clara","Lola"], correct:0},{q:"¿De qué color era Clara?", options:["Verde","Roja"], correct:0},{q:"¿Dónde caminaba?", options:["Por el jardín","Por el mar"], correct:0}]},
+  { title:"El caballo Estrella", text:"Estrella era un caballo negro que corría rápido en el campo. Llevaba una silla marrón y bebía agua del río. Por las tardes se quedaba mirando las montañas lejanas hasta que salía la luna.", img:"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22700%22%20height%3D%22380%22%3E%0A%20%20%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23F1F8E9%22/%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%22160%22%3E%F0%9F%90%B4%3C/text%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2290%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2228%22%20fill%3D%22%2337474F%22%20font-family%3D%22Arial%2C%20sans-serif%22%3EEl%20caballo%20Estrella%3C/text%3E%0A%3C/svg%3E", questions:[{q:"¿Cómo se llamaba el caballo?", options:["Estrella","Nico"], correct:0},{q:"¿De qué color era?", options:["Negro","Blanco"], correct:0},{q:"¿Dónde corría?", options:["En el campo","En la ciudad"], correct:0}]},
+  { title:"El ratón Pepe", text:"Pepe era un ratón gris que vivía en una cocina. Corría rápido para esconderse debajo de la mesa. Le gustaba comer queso amarillo y mirar las migas de pan que caían al suelo.", img:"data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22700%22%20height%3D%22380%22%3E%0A%20%20%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%23ECEFF1%22/%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2255%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%22160%22%3E%F0%9F%90%AD%3C/text%3E%0A%20%20%3Ctext%20x%3D%2250%25%22%20y%3D%2290%25%22%20dominant-baseline%3D%22middle%22%20text-anchor%3D%22middle%22%20font-size%3D%2228%22%20fill%3D%22%2337474F%22%20font-family%3D%22Arial%2C%20sans-serif%22%3EEl%20rat%C3%B3n%20Pepe%3C/text%3E%0A%3C/svg%3E", questions:[{q:"¿Cómo se llamaba el ratón?", options:["Pepe","Tomás"], correct:0},{q:"¿De qué color era Pepe?", options:["Gris","Negro"], correct:0},{q:"¿Dónde vivía?", options:["En una cocina","En el campo"], correct:0}]}
+];
+
+// Elegir icono alusivo a cada pregunta
+function pickIcon(text){
+  const t = text.toLowerCase();
+  if(t.includes("color")) return "🎨";
+  if(t.includes("cómo se llamaba") || t.includes("como se llamaba")) return "🏷️";
+  if(t.includes("dónde") || t.includes("donde")) return "📍";
+  if(t.includes("quién") || t.includes("quien")) return "🧑";
+  return "❓";
+}
+
+function rotateArray(arr){ let n=rotationIndex % arr.length; return arr.slice(n).concat(arr.slice(0,n)); }
+function renderStories(){
+  const container=document.getElementById("stories-container"); container.innerHTML="";
+  totalScore=0; document.getElementById("final-score").innerText="Puntuación total: 0";
+  stories.forEach((story,sIndex)=>{
+    let div=document.createElement("div"); div.className="story";
+    div.innerHTML=`
+      <div class="hero">
+        <img src="${story.img}" alt="Ilustración: ${story.title}">
+        <div class="text">
+          <h2>${story.title}</h2>
+          <p>${story.text}</p>
+          <div class="actions">
+            <button class="action" onclick="speakText(\`${story.text}\`)">🔊 Escuchar</button>
+          </div>
+        </div>
+      </div>
+      <div id="questions-${sIndex}"></div>
+      <button class="action" onclick="checkStory(${sIndex})">✅ Enviar respuestas</button>
+      <div id="score-${sIndex}" class="score-board"></div>`;
+    container.appendChild(div);
+    renderQuestions(story.questions,sIndex);
+  });
+}
+function renderQuestions(questions,storyIndex){
+  let rotated=rotateArray([...questions]);
+  const qContainer=document.getElementById("questions-"+storyIndex);
+  qContainer.innerHTML="";
+  rotated.forEach(q=>{
+    let qDiv=document.createElement("div"); qDiv.className="question";
+    const icon = pickIcon(q.q);
+    qDiv.innerHTML=`<p><span class="q-icon">${icon}</span> ${q.q}</p>`;
+    let optDiv=document.createElement("div"); optDiv.className="options";
+    q.options.forEach((opt,i)=>{
+      let btn=document.createElement("button"); btn.innerText=opt;
+      btn.onclick=()=>toggleSelect(btn); btn.dataset.correct=(i===q.correct);
+      optDiv.appendChild(btn);
+    });
+    qDiv.appendChild(optDiv); qContainer.appendChild(qDiv);
+  });
+}
+function toggleSelect(btn){ btn.classList.toggle("selected"); }
+function checkStory(storyIndex){
+  const qContainer=document.getElementById("questions-"+storyIndex);
+  let score=0;
+  qContainer.querySelectorAll(".options").forEach(optDiv=>{
+    optDiv.querySelectorAll("button").forEach(btn=>{
+      if(btn.classList.contains("selected")){
+        if(btn.dataset.correct==="true"){ btn.classList.add("correct"); score++; }
+        else { btn.classList.add("incorrect"); }
+      }
+      btn.disabled=true;
+    })
+  });
+  document.getElementById("score-"+storyIndex).innerText="⭐ Puntos: "+score;
+  totalScore+=score; document.getElementById("final-score").innerText="🏆 Puntuación total: "+totalScore;
+}
+function restart(){ rotationIndex++; renderStories(); }
+function speakText(text){
+  let voices=speechSynthesis.getVoices().filter(v=>v.lang && v.lang.startsWith("es"));
+  let utter=new SpeechSynthesisUtterance(text);
+  if(voices.length>0){ utter.voice=voices[0]; } else {utter.lang="es-ES";}
+  speechSynthesis.speak(utter);
+}
+renderStories();
+</script>
+</body>
+</html>
